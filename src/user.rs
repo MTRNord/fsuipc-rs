@@ -111,9 +111,10 @@ impl Handle for UserHandle {
     type Sess = UserSession;
 
     fn session(&self) -> UserSession {
+        let data = self.data;
         UserSession {
             handle: self.clone(),
-            buffer: MutRawBytes::new(self.data, FILE_MAPPING_LEN),
+            buffer: MutRawBytes::new(data, FILE_MAPPING_LEN),
         }
     }
 }
@@ -122,10 +123,7 @@ impl Drop for UserHandle {
     fn drop(&mut self) {
         unsafe {
             GlobalDeleteAtom(self.file_mapping_atom);
-            {
-                let data = *self.data;
-                UnmapViewOfFile(data as LPCVOID);
-            }
+            UnmapViewOfFile(self.data as LPCVOID);
             CloseHandle(self.file_mapping);
         }
     }

@@ -134,7 +134,7 @@ mod test {
     fn should_write_to_mutrawbytes() {
         let src = [1u8, 2, 3, 4];
         let mut dest = vec![0u8, 0, 0, 0];
-        let mut raw = MutRawBytes::new(dest.as_mut_ptr().into(), 4);
+        let mut raw = MutRawBytes::new(dest.as_mut_ptr(), 4);
         assert_eq!(raw.write(&src).unwrap(), 4);
         assert_eq!(dest[0], 1);
         assert_eq!(dest[1], 2);
@@ -146,7 +146,7 @@ mod test {
     fn should_write_to_mutrawbytes_with_underflow() {
         let src = [1u8, 2, 3, 4];
         let mut dest = vec![0u8, 0, 0, 0, 0, 0];
-        let mut raw = MutRawBytes::new(dest.as_mut_ptr().into(), 4);
+        let mut raw = MutRawBytes::new(dest.as_mut_ptr(), 4);
         assert_eq!(raw.write(&src).unwrap(), 4);
         assert_eq!(dest[0], 1);
         assert_eq!(dest[1], 2);
@@ -160,7 +160,7 @@ mod test {
     fn should_write_to_mutrawbytes_with_overflow() {
         let src = [1u8, 2, 3, 4];
         let mut dest = vec![0u8, 0];
-        let mut raw = MutRawBytes::new(dest.as_mut_ptr().into(), 2);
+        let mut raw = MutRawBytes::new(dest.as_mut_ptr(), 2);
         assert_eq!(raw.write(&src).unwrap(), 2);
         assert_eq!(dest[0], 1);
         assert_eq!(dest[1], 2);
