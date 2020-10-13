@@ -40,7 +40,6 @@ impl io::Read for RawBytes {
     }
 }
 
-#[derive(Clone)]
 pub struct MutRawBytes {
     data: *mut u8,
     len: usize,
@@ -56,16 +55,10 @@ impl io::Write for MutRawBytes {
     fn write(&mut self, buff: &[u8]) -> io::Result<usize> {
         unsafe {
             let nbytes = min(self.len, buff.len());
-            println!("nbytes: {:#?}", nbytes);
-            for &byte in buff.iter().take(nbytes) {
-                println!("self.len: {:#?}", self.len);
-                println!("byte: {:#?}", byte);
-                println!("*self.data: {:#?}", *self.data);
-                *self.data = byte;
-                println!("*self.data: {:#?}", *self.data);
+            for item in buff.iter().take(nbytes) {
+                *self.data = *item;
                 self.data = self.data.offset(1);
                 self.len -= 1;
-                println!("self.len: {:#?}", self.len);
             }
             Ok(nbytes)
         }

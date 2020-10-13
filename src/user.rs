@@ -13,20 +13,16 @@ use std::ptr;
 use super::ipc::*;
 use super::raw::{MutRawBytes, RawBytes};
 use super::{Handle, Session};
-use winapi::shared::{
-    minwindef::{ATOM, LPCVOID},
-    windef::HWND,
-};
+use winapi::shared::{minwindef::{ATOM, LPCVOID}, windef::HWND};
 use winapi::um::{
-    handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
-    memoryapi::{MapViewOfFile, UnmapViewOfFile, FILE_MAP_WRITE},
-    processthreadsapi::GetCurrentProcessId,
-    winbase::{CreateFileMappingA, GlobalAddAtomA, GlobalDeleteAtom},
+    handleapi::{INVALID_HANDLE_VALUE, CloseHandle},
+    memoryapi::{FILE_MAP_WRITE, MapViewOfFile, UnmapViewOfFile},
     winnt::{HANDLE, PAGE_READWRITE},
     winuser::{FindWindowExA, RegisterWindowMessageA, SendMessageA},
+    processthreadsapi::GetCurrentProcessId,
+    winbase::{GlobalAddAtomA, CreateFileMappingA, GlobalDeleteAtom},
 };
 
-#[derive(Clone)]
 pub struct UserHandle {
     handle: HWND,
     file_mapping_atom: ATOM,
@@ -107,13 +103,13 @@ impl UserHandle {
     }
 }
 
-impl Handle for UserHandle {
-    type Sess = UserSession;
+impl<'a> Handle<'a> for UserHandle {
+    type Sess = UserSession<'a>;
 
-    fn session(&self) -> UserSession {
+    fn session(&'a mut self) -> UserSession<'a> {
         let data = self.data;
         UserSession {
-            handle: self.clone(),
+            handle: self,
             buffer: MutRawBytes::new(data, FILE_MAPPING_LEN),
         }
     }
@@ -129,13 +125,12 @@ impl Drop for UserHandle {
     }
 }
 
-#[derive(Clone)]
-pub struct UserSession {
-    handle: UserHandle,
+pub struct UserSession<'a> {
+    handle: &'a mut UserHandle,
     buffer: MutRawBytes,
 }
 
-impl Session for UserSession {
+impl<'a> Session for UserSession<'a> {
     fn read_bytes(&mut self, offset: u16, dest: *mut u8, len: usize) -> io::Result<usize> {
         self.buffer.write_rsd(offset, dest, len)
     }
@@ -162,25 +157,23 @@ impl Session for UserSession {
                     ),
                 ));
             }
+            let mut buffer = RawBytes::new(self.handle.data, FILE_MAPPING_LEN);
             loop {
-                {
-                    let mut buffer = RawBytes::new(self.handle.data, FILE_MAPPING_LEN);
-                    let header = buffer.read_header()?;
-                    match header {
-                        MsgHeader::ReadStateData {
-                            offset: _,
-                            len,
-                            target,
-                        } => {
-                            let mut output = MutRawBytes::new(target, len);
-                            buffer.read_body(&header, &mut output)?;
-                        }
-                        MsgHeader::WriteStateData { offset: _, len: _ } => {
-                            let mut output = io::sink();
-                            buffer.read_body(&header, &mut output)?;
-                        }
-                        MsgHeader::TerminationMark => return Ok(buffer.consumed()),
+                let header = buffer.read_header()?;
+                match header {
+                    MsgHeader::ReadStateData {
+                        offset: _,
+                        len,
+                        target,
+                    } => {
+                        let mut output = MutRawBytes::new(target, len);
+                        buffer.read_body(&header, &mut output)?;
                     }
+                    MsgHeader::WriteStateData { offset: _, len: _ } => {
+                        let mut output = io::sink();
+                        buffer.read_body(&header, &mut output)?;
+                    }
+                    MsgHeader::TerminationMark => return Ok(buffer.consumed()),
                 }
             }
         }

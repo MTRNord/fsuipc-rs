@@ -48,10 +48,10 @@ impl LocalHandle {
     }
 }
 
-impl Handle for LocalHandle {
+impl<'a> Handle<'a> for LocalHandle {
     type Sess = LocalSession;
 
-    fn session(&self) -> LocalSession {
+    fn session(&'a mut self) -> LocalSession {
         LocalSession::new(self.handle)
     }
 }
@@ -140,7 +140,7 @@ const WM_IPC_TIMEOUT: u32 = 10000;
 mod test {
     use super::*;
     use std::thread;
-    use winapi::shared::windef::HWND;
+    use winapi::windef::HWND;
 
     #[test]
     fn test_local_handler_can_be_shared() {

@@ -374,12 +374,8 @@ mod test {
     #[test]
     fn should_write_tm_body() {
         let mut buff = Vec::new();
-        let mut input = Cursor::new(vec![0x01u8, 0x02, 0x03, 0x04]);
-        assert_eq!(
-            buff.write_body(&MsgHeader::TerminationMark, &mut input)
-                .unwrap(),
-            0
-        );
+        let mut input = Cursor::new(vec![ 0x01u8, 0x02, 0x03, 0x04 ]);
+        assert_eq!(buff.write_body(&MsgHeader::TerminationMark, &mut input).unwrap(), 0);
         assert_eq!(buff.len(), 0);
     }
 }
