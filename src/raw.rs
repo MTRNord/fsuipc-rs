@@ -56,9 +56,9 @@ impl io::Write for MutRawBytes {
     fn write(&mut self, buff: &[u8]) -> io::Result<usize> {
         unsafe {
             let nbytes = min(self.len, buff.len());
-            for *item in buff.iter().take(nbytes) {
+            for item in buff.iter().take(nbytes) {
                 let mut data: *mut u8 = *self.data;
-                *data = item;
+                *data = *item;
                 data = data.offset(1);
                 self.data = Arc::new(data);
                 self.len -= 1;
