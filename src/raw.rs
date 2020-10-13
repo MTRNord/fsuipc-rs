@@ -8,7 +8,6 @@
 
 use std::cmp::min;
 use std::io;
-use std::sync::Arc;
 
 pub struct RawBytes {
     data: *const u8,
@@ -43,12 +42,12 @@ impl io::Read for RawBytes {
 
 #[derive(Clone)]
 pub struct MutRawBytes {
-    data: Arc<*mut u8>,
+    data: *mut u8,
     len: usize,
 }
 
 impl MutRawBytes {
-    pub fn new(data: Arc<*mut u8>, len: usize) -> Self {
+    pub fn new(data: *mut u8, len: usize) -> Self {
         MutRawBytes { data, len }
     }
 }
@@ -57,13 +56,16 @@ impl io::Write for MutRawBytes {
     fn write(&mut self, buff: &[u8]) -> io::Result<usize> {
         unsafe {
             let nbytes = min(self.len, buff.len());
-            for item in buff.iter().take(nbytes) {
-                {
-                    let mutable_data = Arc::make_mut(&mut self.data);
-                    **mutable_data = *item;
-                    *mutable_data = mutable_data.offset(1);
-                    self.len -= 1;
-                }
+            println!("nbytes: {:#?}", nbytes);
+            for &byte in buff.iter().take(nbytes) {
+                println!("self.len: {:#?}", self.len);
+                println!("byte: {:#?}", byte);
+                println!("*self.data: {:#?}", *self.data);
+                *self.data = byte;
+                println!("*self.data: {:#?}", *self.data);
+                self.data = self.data.offset(1);
+                self.len -= 1;
+                println!("self.len: {:#?}", self.len);
             }
             Ok(nbytes)
         }

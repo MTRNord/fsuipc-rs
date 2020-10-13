@@ -9,7 +9,6 @@
 use std::ffi::CString;
 use std::io;
 use std::ptr;
-use std::sync::Arc;
 
 use super::ipc::*;
 use super::raw::{MutRawBytes, RawBytes};
@@ -33,7 +32,7 @@ pub struct UserHandle {
     file_mapping_atom: ATOM,
     file_mapping: HANDLE,
     msg_id: u32,
-    data: Arc<*mut u8>,
+    data: *mut u8,
 }
 
 impl UserHandle {
@@ -102,7 +101,7 @@ impl UserHandle {
                 file_mapping_atom,
                 file_mapping,
                 msg_id,
-                data: data.into(),
+                data,
             })
         }
     }
@@ -114,7 +113,7 @@ impl Handle for UserHandle {
     fn session(&self) -> UserSession {
         UserSession {
             handle: self.clone(),
-            buffer: MutRawBytes::new(self.data.clone(), FILE_MAPPING_LEN),
+            buffer: MutRawBytes::new(self.data, FILE_MAPPING_LEN),
         }
     }
 }
@@ -123,7 +122,10 @@ impl Drop for UserHandle {
     fn drop(&mut self) {
         unsafe {
             GlobalDeleteAtom(self.file_mapping_atom);
-            UnmapViewOfFile(*self.data as LPCVOID);
+            {
+                let data = *self.data;
+                UnmapViewOfFile(data as LPCVOID);
+            }
             CloseHandle(self.file_mapping);
         }
     }
@@ -162,23 +164,25 @@ impl Session for UserSession {
                     ),
                 ));
             }
-            let mut buffer = RawBytes::new(*Arc::make_mut(&mut self.handle.data), FILE_MAPPING_LEN);
             loop {
-                let header = buffer.read_header()?;
-                match header {
-                    MsgHeader::ReadStateData {
-                        offset: _,
-                        len,
-                        target,
-                    } => {
-                        let mut output = MutRawBytes::new(target.into(), len);
-                        buffer.read_body(&header, &mut output)?;
+                {
+                    let mut buffer = RawBytes::new(self.handle.data, FILE_MAPPING_LEN);
+                    let header = buffer.read_header()?;
+                    match header {
+                        MsgHeader::ReadStateData {
+                            offset: _,
+                            len,
+                            target,
+                        } => {
+                            let mut output = MutRawBytes::new(target, len);
+                            buffer.read_body(&header, &mut output)?;
+                        }
+                        MsgHeader::WriteStateData { offset: _, len: _ } => {
+                            let mut output = io::sink();
+                            buffer.read_body(&header, &mut output)?;
+                        }
+                        MsgHeader::TerminationMark => return Ok(buffer.consumed()),
                     }
-                    MsgHeader::WriteStateData { offset: _, len: _ } => {
-                        let mut output = io::sink();
-                        buffer.read_body(&header, &mut output)?;
-                    }
-                    MsgHeader::TerminationMark => return Ok(buffer.consumed()),
                 }
             }
         }

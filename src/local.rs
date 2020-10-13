@@ -118,7 +118,7 @@ impl Session for LocalSession {
                         len,
                         target,
                     } => {
-                        let mut output = MutRawBytes::new(target.into(), len);
+                        let mut output = MutRawBytes::new(target, len);
                         self.buffer.read_body(&header, &mut output)?;
                     }
                     MsgHeader::WriteStateData { offset: _, len: _ } => {
