@@ -8,7 +8,7 @@
 
 use std::cmp::min;
 use std::io;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 pub struct RawBytes {
     data: *const u8,

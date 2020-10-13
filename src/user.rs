@@ -9,7 +9,7 @@
 use std::ffi::CString;
 use std::io;
 use std::ptr;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use super::ipc::*;
 use super::raw::{MutRawBytes, RawBytes};
