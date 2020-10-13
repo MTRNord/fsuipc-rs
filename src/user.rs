@@ -9,18 +9,22 @@
 use std::ffi::CString;
 use std::io;
 use std::ptr;
+use std::sync::{Arc};
 
 use super::ipc::*;
 use super::raw::{MutRawBytes, RawBytes};
 use super::{Handle, Session};
-use winapi::shared::{minwindef::{ATOM, LPCVOID}, windef::HWND};
+use winapi::shared::{
+    minwindef::{ATOM, LPCVOID},
+    windef::HWND,
+};
 use winapi::um::{
-    handleapi::{INVALID_HANDLE_VALUE, CloseHandle},
-    memoryapi::{FILE_MAP_WRITE, MapViewOfFile, UnmapViewOfFile},
+    handleapi::{CloseHandle, INVALID_HANDLE_VALUE},
+    memoryapi::{MapViewOfFile, UnmapViewOfFile, FILE_MAP_WRITE},
+    processthreadsapi::GetCurrentProcessId,
+    winbase::{CreateFileMappingA, GlobalAddAtomA, GlobalDeleteAtom},
     winnt::{HANDLE, PAGE_READWRITE},
     winuser::{FindWindowExA, RegisterWindowMessageA, SendMessageA},
-    processthreadsapi::GetCurrentProcessId,
-    winbase::{GlobalAddAtomA, CreateFileMappingA, GlobalDeleteAtom},
 };
 
 #[derive(Clone)]
@@ -29,7 +33,7 @@ pub struct UserHandle {
     file_mapping_atom: ATOM,
     file_mapping: HANDLE,
     msg_id: u32,
-    data: *mut u8,
+    data: Arc<*mut u8>,
 }
 
 impl UserHandle {
@@ -98,20 +102,19 @@ impl UserHandle {
                 file_mapping_atom,
                 file_mapping,
                 msg_id,
-                data,
+                data: data.into(),
             })
         }
     }
 }
 
-impl<'a> Handle<'a> for UserHandle {
-    type Sess = UserSession<'a>;
+impl Handle for UserHandle {
+    type Sess = UserSession;
 
-    fn session(&'a mut self) -> UserSession<'a> {
-        let data = self.data;
+    fn session(&self) -> UserSession {
         UserSession {
-            handle: self,
-            buffer: MutRawBytes::new(data, FILE_MAPPING_LEN),
+            handle: self.clone(),
+            buffer: MutRawBytes::new(self.data.clone(), FILE_MAPPING_LEN),
         }
     }
 }
@@ -120,18 +123,18 @@ impl Drop for UserHandle {
     fn drop(&mut self) {
         unsafe {
             GlobalDeleteAtom(self.file_mapping_atom);
-            UnmapViewOfFile(self.data as LPCVOID);
+            UnmapViewOfFile(*self.data as LPCVOID);
             CloseHandle(self.file_mapping);
         }
     }
 }
 
-pub struct UserSession<'a> {
-    handle: &'a mut UserHandle,
+pub struct UserSession {
+    handle: UserHandle,
     buffer: MutRawBytes,
 }
 
-impl<'a> Session for UserSession<'a> {
+impl Session for UserSession {
     fn read_bytes(&mut self, offset: u16, dest: *mut u8, len: usize) -> io::Result<usize> {
         self.buffer.write_rsd(offset, dest, len)
     }
@@ -158,7 +161,7 @@ impl<'a> Session for UserSession<'a> {
                     ),
                 ));
             }
-            let mut buffer = RawBytes::new(self.handle.data, FILE_MAPPING_LEN);
+            let mut buffer = RawBytes::new(*self.handle.data, FILE_MAPPING_LEN);
             loop {
                 let header = buffer.read_header()?;
                 match header {
@@ -167,7 +170,7 @@ impl<'a> Session for UserSession<'a> {
                         len,
                         target,
                     } => {
-                        let mut output = MutRawBytes::new(target, len);
+                        let mut output = MutRawBytes::new(target.into(), len);
                         buffer.read_body(&header, &mut output)?;
                     }
                     MsgHeader::WriteStateData { offset: _, len: _ } => {

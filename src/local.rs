@@ -48,10 +48,10 @@ impl LocalHandle {
     }
 }
 
-impl<'a> Handle<'a> for LocalHandle {
+impl Handle for LocalHandle {
     type Sess = LocalSession;
 
-    fn session(&'a mut self) -> LocalSession {
+    fn session(&self) -> LocalSession {
         LocalSession::new(self.handle)
     }
 }
@@ -118,7 +118,7 @@ impl Session for LocalSession {
                         len,
                         target,
                     } => {
-                        let mut output = MutRawBytes::new(target, len);
+                        let mut output = MutRawBytes::new(target.into(), len);
                         self.buffer.read_body(&header, &mut output)?;
                     }
                     MsgHeader::WriteStateData { offset: _, len: _ } => {
@@ -140,7 +140,7 @@ const WM_IPC_TIMEOUT: u32 = 10000;
 mod test {
     use super::*;
     use std::thread;
-    use winapi::windef::HWND;
+    use winapi::shared::windef::HWND;
 
     #[test]
     fn test_local_handler_can_be_shared() {
