@@ -41,6 +41,7 @@ impl io::Read for RawBytes {
     }
 }
 
+#[derive(Clone)]
 pub struct MutRawBytes {
     data: Arc<*mut u8>,
     len: usize,
@@ -53,6 +54,7 @@ impl MutRawBytes {
 }
 
 impl io::Write for MutRawBytes {
+    #[allow(unused_assignments)]
     fn write(&mut self, buff: &[u8]) -> io::Result<usize> {
         unsafe {
             let nbytes = min(self.len, buff.len());
@@ -60,7 +62,6 @@ impl io::Write for MutRawBytes {
                 let mut data: *mut u8 = *self.data;
                 *data = *item;
                 data = data.offset(1);
-                self.data = Arc::new(data);
                 self.len -= 1;
             }
             Ok(nbytes)

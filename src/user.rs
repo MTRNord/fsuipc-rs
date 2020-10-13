@@ -129,6 +129,7 @@ impl Drop for UserHandle {
     }
 }
 
+#[derive(Clone)]
 pub struct UserSession {
     handle: UserHandle,
     buffer: MutRawBytes,
