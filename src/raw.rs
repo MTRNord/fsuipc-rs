@@ -1,4 +1,3 @@
-
 //
 // FSUIPC library
 // Copyright (c) 2015 Alvaro Polo
@@ -7,8 +6,8 @@
 // License, v. 2.0. If a copy of the MPL was not distributed with this
 // file, You can obtain one at http://mozilla.org/MPL/2.0/.
 
-use std::io;
 use std::cmp::min;
+use std::io;
 
 pub struct RawBytes {
     data: *const u8,
@@ -18,18 +17,20 @@ pub struct RawBytes {
 
 impl RawBytes {
     pub fn new(data: *const u8, len: usize) -> Self {
-        RawBytes { data: data, len: len, read: 0 }
+        RawBytes { data, len, read: 0 }
     }
 
-    pub fn consumed(&self) -> usize { self.read }
+    pub fn consumed(&self) -> usize {
+        self.read
+    }
 }
 
 impl io::Read for RawBytes {
     fn read(&mut self, buff: &mut [u8]) -> io::Result<usize> {
         unsafe {
             let nbytes = min(self.len, buff.len());
-            for i in 0..nbytes {
-                buff[i] = *self.data;
+            for item in buff.iter_mut().take(nbytes) {
+                *item = *self.data;
                 self.data = self.data.offset(1);
                 self.len -= 1;
                 self.read += 1;
@@ -46,7 +47,7 @@ pub struct MutRawBytes {
 
 impl MutRawBytes {
     pub fn new(data: *mut u8, len: usize) -> Self {
-        MutRawBytes { data: data, len: len }
+        MutRawBytes { data, len }
     }
 }
 
@@ -54,8 +55,8 @@ impl io::Write for MutRawBytes {
     fn write(&mut self, buff: &[u8]) -> io::Result<usize> {
         unsafe {
             let nbytes = min(self.len, buff.len());
-            for i in 0..nbytes {
-                *self.data = buff[i];
+            for item in buff.iter().take(nbytes) {
+                *self.data = *item;
                 self.data = self.data.offset(1);
                 self.len -= 1;
             }
@@ -63,7 +64,9 @@ impl io::Write for MutRawBytes {
         }
     }
 
-    fn flush(&mut self) -> io::Result<()> { Ok(()) }
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]

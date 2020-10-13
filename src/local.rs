@@ -1,4 +1,3 @@
-
 //
 // FSUIPC library
 // Copyright (c) 2015 Alvaro Polo
@@ -12,13 +11,13 @@ use std::io;
 use std::ptr;
 
 use user32::{FindWindowExA, SendMessageTimeoutA};
-use winapi::WM_USER;
 use winapi::windef::HWND;
 use winapi::winuser::SMTO_BLOCK;
+use winapi::WM_USER;
 
-use super::{Handle, Session};
 use super::ipc::*;
 use super::raw::MutRawBytes;
+use super::{Handle, Session};
 
 /// A handle to FSUIPc that uses local IPC communication to the FSUIPC module
 /// This kind of handle must be used from code running in the same process as FSUIPC does.
@@ -34,13 +33,18 @@ impl LocalHandle {
         unsafe {
             let win_name = CString::new("UIPCMAIN").unwrap();
             let handle = FindWindowExA(
-                ptr::null_mut(), ptr::null_mut(), win_name.as_ptr(), ptr::null_mut());
-            if handle != ptr::null_mut() {
-                Ok(LocalHandle { handle: handle })
+                ptr::null_mut(),
+                ptr::null_mut(),
+                win_name.as_ptr(),
+                ptr::null_mut(),
+            );
+            if !handle.is_null() {
+                Ok(LocalHandle { handle })
             } else {
                 Err(io::Error::new(
                     io::ErrorKind::ConnectionRefused,
-                    "cannot connect to local FSUIPC: cannot create window handle"))
+                    "cannot connect to local FSUIPC: cannot create window handle",
+                ))
             }
         }
     }
@@ -62,8 +66,8 @@ pub struct LocalSession {
 impl LocalSession {
     fn new(handle: HWND) -> Self {
         let mut session = LocalSession {
-            handle: handle,
-            buffer: io::Cursor::new(Vec::with_capacity(4096))
+            handle,
+            buffer: io::Cursor::new(Vec::with_capacity(4096)),
         };
         // First 4-bytes seems to be for a stack frame pointer that is not actually used
         session.buffer.set_position(4);
@@ -82,7 +86,7 @@ impl Session for LocalSession {
 
     fn process(mut self) -> io::Result<usize> {
         unsafe {
-            try!(self.buffer.write_header(&MsgHeader::TerminationMark));
+            self.buffer.write_header(&MsgHeader::TerminationMark)?;
             let nbytes = self.buffer.position() as usize;
             let buff = self.buffer.get_ref().as_ptr() as WinInt;
             let mut process_result: WinUInt = 0;
@@ -93,11 +97,13 @@ impl Session for LocalSession {
                 buff,
                 SMTO_BLOCK,
                 WM_IPC_TIMEOUT,
-                &mut process_result as *mut WinUInt);
+                &mut process_result as *mut WinUInt,
+            );
             if send_result == 0 {
                 return Err(io::Error::new(
                     io::ErrorKind::TimedOut,
-                    "timed out while waiting for a response from FSUIPC"));
+                    "timed out while waiting for a response from FSUIPC",
+                ));
             }
             if process_result != FS6IPC_MESSAGE_SUCCESS {
                 return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
@@ -107,17 +113,21 @@ impl Session for LocalSession {
             // First 4-bytes seems to be for a stack frame pointer that is not actually used
             self.buffer.set_position(4);
             loop {
-                let header = try!(self.buffer.read_header());
-                match &header {
-                    &MsgHeader::ReadStateData { offset: _, len, target } => {
+                let header = self.buffer.read_header()?;
+                match header {
+                    MsgHeader::ReadStateData {
+                        offset: _,
+                        len,
+                        target,
+                    } => {
                         let mut output = MutRawBytes::new(target, len);
-                        try!(self.buffer.read_body(&header, &mut output));
-                    },
-                    &MsgHeader::WriteStateData { offset: _, len: _ } => {
+                        self.buffer.read_body(&header, &mut output)?;
+                    }
+                    MsgHeader::WriteStateData { offset: _, len: _ } => {
                         let mut output = io::sink();
-                        try!(self.buffer.read_body(&header, &mut output));
-                    },
-                    &MsgHeader::TerminationMark => return Ok(nbytes),
+                        self.buffer.read_body(&header, &mut output)?;
+                    }
+                    MsgHeader::TerminationMark => return Ok(nbytes),
                 }
             }
         }
@@ -130,15 +140,15 @@ const WM_IPC_TIMEOUT: u32 = 10000;
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use std::thread;
     use winapi::windef::HWND;
-    use super::*;
 
     #[test]
     fn test_local_handler_can_be_shared() {
-        let handler = LocalHandle{ handle: 0 as HWND };
+        let handler = LocalHandle { handle: 0 as HWND };
         let handler_copy = handler.clone();
-        let child = thread::spawn(move|| {
+        let child = thread::spawn(move || {
             assert_eq!(0 as HWND, handler_copy.handle);
         });
         child.join().unwrap();

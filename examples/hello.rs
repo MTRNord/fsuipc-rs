@@ -11,8 +11,8 @@ extern crate fsuipc;
 use std::io;
 use std::process;
 
-use fsuipc::*;
 use fsuipc::user::*;
+use fsuipc::*;
 
 fn main() {
     match run() {
@@ -20,7 +20,7 @@ fn main() {
         Err(e) => {
             println!("IO error: {:?}", e);
             process::exit(-1);
-        },
+        }
     }
 }
 
@@ -38,8 +38,15 @@ fn run() -> io::Result<()> {
     try!(session.read(0x0239, &mut minute));
     try!(session.read(0x023a, &mut second));
     try!(session.process());
-    println!("FSUIPC version {:x}.{:x}", fsuipc_ver >> 28, fsuipc_ver >> 20);
+    println!(
+        "FSUIPC version {:x}.{:x}",
+        fsuipc_ver >> 28,
+        fsuipc_ver >> 20
+    );
     println!("FS/P3D version {}", fs_ver);
-    println!("Simulation local time is {:02}:{:02}:{:02}", hour, minute, second);
+    println!(
+        "Simulation local time is {:02}:{:02}:{:02}",
+        hour, minute, second
+    );
     Ok(())
 }

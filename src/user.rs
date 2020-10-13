@@ -13,15 +13,15 @@ use std::ptr;
 
 use kernel32::*;
 use user32::{FindWindowExA, RegisterWindowMessageA, SendMessageA};
-use winapi::INVALID_HANDLE_VALUE;
 use winapi::memoryapi::FILE_MAP_WRITE;
 use winapi::minwindef::ATOM;
 use winapi::windef::HWND;
 use winapi::winnt::{HANDLE, PAGE_READWRITE};
+use winapi::INVALID_HANDLE_VALUE;
 
-use super::{Handle, Session};
 use super::ipc::*;
 use super::raw::{MutRawBytes, RawBytes};
+use super::{Handle, Session};
 
 pub struct UserHandle {
     handle: HWND,
@@ -39,55 +39,65 @@ impl UserHandle {
                 ptr::null_mut(),
                 ptr::null_mut(),
                 win_name.as_ptr(),
-                ptr::null_mut());
-            if handle == ptr::null_mut() {
+                ptr::null_mut(),
+            );
+            if handle.is_null() {
                 return Err(io::Error::new(
                     io::ErrorKind::ConnectionRefused,
-                    "cannot connect to user FSUIPC: cannot create window handle"));
+                    "cannot connect to user FSUIPC: cannot create window handle",
+                ));
             }
             let msg_name = CString::new("FsasmLib:IPC").unwrap();
             let msg_id = RegisterWindowMessageA(msg_name.as_ptr());
             if msg_id == 0 {
                 return Err(io::Error::new(
                     io::ErrorKind::ConnectionRefused,
-                    "cannot connect to user FSUIPC: cannot register window message"));
+                    "cannot connect to user FSUIPC: cannot register window message",
+                ));
             }
 
-            let file_mapping_name = CString::new(
-                format!("FsasmLib:IPC:{:x}:{:x}",
-                    GetCurrentProcessId(),
-                    next_file_mapping_index())).unwrap();
+            let file_mapping_name = CString::new(format!(
+                "FsasmLib:IPC:{:x}:{:x}",
+                GetCurrentProcessId(),
+                next_file_mapping_index()
+            ))
+            .unwrap();
 
             let file_mapping_atom = GlobalAddAtomA(file_mapping_name.as_ptr());
             if file_mapping_atom == 0 {
                 return Err(io::Error::new(
                     io::ErrorKind::ConnectionRefused,
-                    "cannot connect to user FSUIPC: cannot add global atom"));
+                    "cannot connect to user FSUIPC: cannot add global atom",
+                ));
             }
 
             let file_mapping = CreateFileMappingA(
                 INVALID_HANDLE_VALUE,
                 ptr::null_mut(),
                 PAGE_READWRITE,
-                0, FILE_MAPPING_LEN as u32,
-                file_mapping_name.as_ptr());
-            if file_mapping == ptr::null_mut() {
+                0,
+                FILE_MAPPING_LEN as u32,
+                file_mapping_name.as_ptr(),
+            );
+            if file_mapping.is_null() {
                 return Err(io::Error::new(
                     io::ErrorKind::ConnectionRefused,
-                    "cannot connect to user FSUIPC: cannot create file mapping"));
+                    "cannot connect to user FSUIPC: cannot create file mapping",
+                ));
             }
             let data = MapViewOfFile(file_mapping, FILE_MAP_WRITE, 0, 0, 0) as *mut u8;
-            if data == ptr::null_mut() {
+            if data.is_null() {
                 return Err(io::Error::new(
                     io::ErrorKind::ConnectionRefused,
-                    "cannot connect to user FSUIPC: cannot map view of file"));
+                    "cannot connect to user FSUIPC: cannot map view of file",
+                ));
             }
             Ok(UserHandle {
-                handle: handle,
-                file_mapping_atom: file_mapping_atom,
-                file_mapping: file_mapping,
-                msg_id: msg_id,
-                data: data,
+                handle,
+                file_mapping_atom,
+                file_mapping,
+                msg_id,
+                data,
             })
         }
     }
@@ -100,7 +110,7 @@ impl<'a> Handle<'a> for UserHandle {
         let data = self.data;
         UserSession {
             handle: self,
-            buffer: MutRawBytes::new(data, FILE_MAPPING_LEN)
+            buffer: MutRawBytes::new(data, FILE_MAPPING_LEN),
         }
     }
 }
@@ -131,30 +141,39 @@ impl<'a> Session for UserSession<'a> {
 
     fn process(mut self) -> io::Result<usize> {
         unsafe {
-            try!(self.buffer.write_header(&MsgHeader::TerminationMark));
+            self.buffer.write_header(&MsgHeader::TerminationMark)?;
             let send_result = SendMessageA(
                 self.handle.handle,
                 self.handle.msg_id,
                 self.handle.file_mapping_atom as WinUInt,
-                0);
+                0,
+            );
             if send_result != FS6IPC_MESSAGE_SUCCESS {
-                return Err(io::Error::new(io::ErrorKind::InvalidData, format!(
-                    "FSUIPC rejected the requests with error {}; possible buffer corruption",
-                    send_result)));
+                return Err(io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!(
+                        "FSUIPC rejected the requests with error {}; possible buffer corruption",
+                        send_result
+                    ),
+                ));
             }
             let mut buffer = RawBytes::new(self.handle.data, FILE_MAPPING_LEN);
             loop {
-                let header = try!(buffer.read_header());
-                match &header {
-                    &MsgHeader::ReadStateData { offset: _, len, target } => {
+                let header = buffer.read_header()?;
+                match header {
+                    MsgHeader::ReadStateData {
+                        offset: _,
+                        len,
+                        target,
+                    } => {
                         let mut output = MutRawBytes::new(target, len);
-                        try!(buffer.read_body(&header, &mut output));
-                    },
-                    &MsgHeader::WriteStateData { offset: _, len: _ } => {
+                        buffer.read_body(&header, &mut output)?;
+                    }
+                    MsgHeader::WriteStateData { offset: _, len: _ } => {
                         let mut output = io::sink();
-                        try!(buffer.read_body(&header, &mut output));
-                    },
-                    &MsgHeader::TerminationMark => return Ok(buffer.consumed()),
+                        buffer.read_body(&header, &mut output)?;
+                    }
+                    MsgHeader::TerminationMark => return Ok(buffer.consumed()),
                 }
             }
         }
@@ -170,6 +189,6 @@ fn next_file_mapping_index() -> u32 {
 }
 
 const FS6IPC_MESSAGE_SUCCESS: WinInt = 1;
-const FILE_MAPPING_LEN: usize = 64*1024;
+const FILE_MAPPING_LEN: usize = 64 * 1024;
 
 static mut FILE_MAPPING_INDEX: u32 = 0;
