@@ -23,6 +23,7 @@ use winapi::um::{
     winbase::{GlobalAddAtomA, CreateFileMappingA, GlobalDeleteAtom},
 };
 
+#[derive(Clone)]
 pub struct UserHandle {
     handle: HWND,
     file_mapping_atom: ATOM,
