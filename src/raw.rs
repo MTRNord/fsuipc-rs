@@ -41,6 +41,7 @@ impl io::Read for RawBytes {
     }
 }
 
+#[derive(Clone)]
 pub struct MutRawBytes {
     data: Arc<*mut u8>,
     len: usize,
@@ -57,7 +58,7 @@ impl io::Write for MutRawBytes {
         unsafe {
             let nbytes = min(self.len, buff.len());
             for item in buff.iter().take(nbytes) {
-                let mut data: *mut u8 = *self.data;
+                let mut data: *mut u8 = Arc::try_unwrap(self.clone().data).unwrap();
                 *data = *item;
                 data = self.data.offset(1);
                 self.data = Arc::new(data);
