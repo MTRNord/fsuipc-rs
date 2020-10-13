@@ -162,7 +162,7 @@ impl Session for UserSession {
                     ),
                 ));
             }
-            let mut buffer = RawBytes::new(*self.handle.data, FILE_MAPPING_LEN);
+            let mut buffer = RawBytes::new(*Arc::make_mut(&mut self.handle.data), FILE_MAPPING_LEN);
             loop {
                 let header = buffer.read_header()?;
                 match header {

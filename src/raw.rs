@@ -59,7 +59,7 @@ impl io::Write for MutRawBytes {
             let nbytes = min(self.len, buff.len());
             for item in buff.iter().take(nbytes) {
                 {
-                    let mutable_data = Arc::get_mut(&mut self.data).unwrap();
+                    let mutable_data = Arc::make_mut(&mut self.data);
                     **mutable_data = *item;
                     *mutable_data = mutable_data.offset(1);
                     self.len -= 1;
