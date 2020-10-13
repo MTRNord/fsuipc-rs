@@ -54,14 +54,16 @@ impl MutRawBytes {
 }
 
 impl io::Write for MutRawBytes {
-    #[allow(unused_assignments)]
     fn write(&mut self, buff: &[u8]) -> io::Result<usize> {
         unsafe {
             let nbytes = min(self.len, buff.len());
             for item in buff.iter().take(nbytes) {
-                **Arc::get_mut(&mut self.data).unwrap()= *item;
-                *Arc::get_mut(&mut self.data).unwrap() = self.data.offset(1);
-                self.len -= 1;
+                {
+                    let mutable_data = Arc::get_mut(&mut self.data).unwrap();
+                    **mutable_data = *item;
+                    *mutable_data = mutable_data.offset(1);
+                    self.len -= 1;
+                }
             }
             Ok(nbytes)
         }
