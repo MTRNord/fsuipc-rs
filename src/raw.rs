@@ -59,9 +59,8 @@ impl io::Write for MutRawBytes {
         unsafe {
             let nbytes = min(self.len, buff.len());
             for item in buff.iter().take(nbytes) {
-                let mut data: *mut u8 = *self.data;
-                *data = *item;
-                data = data.offset(1);
+                **Arc::get_mut(&mut self.data).unwrap()= *item;
+                *Arc::get_mut(&mut self.data).unwrap() = self.data.offset(1);
                 self.len -= 1;
             }
             Ok(nbytes)
