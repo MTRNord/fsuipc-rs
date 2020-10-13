@@ -8,20 +8,20 @@
 
 use std::ffi::CString;
 use std::io;
-use std::os::raw::c_void;
 use std::ptr;
-
-use kernel32::*;
-use user32::{FindWindowExA, RegisterWindowMessageA, SendMessageA};
-use winapi::memoryapi::FILE_MAP_WRITE;
-use winapi::minwindef::ATOM;
-use winapi::windef::HWND;
-use winapi::winnt::{HANDLE, PAGE_READWRITE};
-use winapi::INVALID_HANDLE_VALUE;
 
 use super::ipc::*;
 use super::raw::{MutRawBytes, RawBytes};
 use super::{Handle, Session};
+use winapi::shared::{minwindef::{ATOM, LPCVOID}, windef::HWND};
+use winapi::um::{
+    handleapi::{INVALID_HANDLE_VALUE, CloseHandle},
+    memoryapi::{FILE_MAP_WRITE, MapViewOfFile, UnmapViewOfFile},
+    winnt::{HANDLE, PAGE_READWRITE},
+    winuser::{FindWindowExA, RegisterWindowMessageA, SendMessageA},
+    processthreadsapi::GetCurrentProcessId,
+    winbase::{GlobalAddAtomA, CreateFileMappingA, GlobalDeleteAtom},
+};
 
 pub struct UserHandle {
     handle: HWND,
@@ -119,7 +119,7 @@ impl Drop for UserHandle {
     fn drop(&mut self) {
         unsafe {
             GlobalDeleteAtom(self.file_mapping_atom);
-            UnmapViewOfFile(self.data as *const c_void);
+            UnmapViewOfFile(self.data as LPCVOID);
             CloseHandle(self.file_mapping);
         }
     }

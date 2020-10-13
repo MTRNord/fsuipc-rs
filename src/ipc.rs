@@ -13,15 +13,8 @@ use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
 
 use super::raw::RawBytes;
 
-#[cfg(all(windows, target_pointer_width = "32"))]
-pub type WinUInt = u32;
-#[cfg(all(windows, target_pointer_width = "32"))]
-pub type WinInt = i32;
-
-#[cfg(all(windows, target_pointer_width = "64"))]
-pub type WinUInt = u64;
-#[cfg(all(windows, target_pointer_width = "64"))]
-pub type WinInt = i64;
+pub type WinUInt = usize;
+pub type WinInt = isize;
 
 /// The header of a message sent to FSUIPC module via IPC
 #[derive(Debug, PartialEq)]
@@ -373,6 +366,16 @@ mod test {
                 .unwrap(),
             0
         );
+
+        buff.set_position(0);
+        assert_eq!(buff.read_u32::<LittleEndian>().unwrap(), 0);
+    }
+
+    #[test]
+    fn should_write_tm_body() {
+        let mut buff = Vec::new();
+        let mut input = Cursor::new(vec![ 0x01u8, 0x02, 0x03, 0x04 ]);
+        assert_eq!(buff.write_body(&MsgHeader::TerminationMark, &mut input).unwrap(), 0);
         assert_eq!(buff.len(), 0);
     }
 }

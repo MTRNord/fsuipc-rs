@@ -10,10 +10,8 @@ use std::ffi::CString;
 use std::io;
 use std::ptr;
 
-use user32::{FindWindowExA, SendMessageTimeoutA};
-use winapi::windef::HWND;
-use winapi::winuser::SMTO_BLOCK;
-use winapi::WM_USER;
+use winapi::shared::windef::HWND;
+use winapi::um::winuser::{FindWindowExA, SendMessageTimeoutA, SMTO_BLOCK, WM_USER};
 
 use super::ipc::*;
 use super::raw::MutRawBytes;
