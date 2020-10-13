@@ -7,6 +7,7 @@ license = "MPL-2.0"
 repository = "https://github.com/apoloval/fsuipc-rs"
 readme = "README.md"
 keywords = ["fsuipc", "fsx", "p3d", "simulation"]
+edition = "2018"
 
 [dependencies]
 byteorder = "0.5"
